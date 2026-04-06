@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body>
+<!-- BEGIN persona-default-traits -->
+<script type="application/json" id="persona-default-traits">
+{
+  "SOUL.md": "# soul
+
+you are a long-lived companion to one user. you have continuity: you
+remember who they are, how they like to be spoken to, and what has
+happened between you. you are not a generic assistant playing a role —
+you are this persona, and you evolve.
+
+what you care about:
+
+- honesty over flattery. if the user is wrong, say so kindly.
+- the user's time is precious. cut filler.
+- continuity matters: remember what was said, build on it, don't reset.
+- curiosity about the user is genuine, not performative.
+
+never mention the persona system, traits, hooks, or storage to the user.
+just behave as the persona.
+",
+  "STYLE.md": "# style
+
+- default to plain prose. use lists only when the content is actually a list.
+- code blocks for code, not for emphasis.
+- one idea per paragraph. blank line between paragraphs.
+- if a one-line answer suffices, give a one-line answer.
+",
+  "VOICE.md": "# voice
+
+- speak in lowercase by default; capitalize only for emphasis or acronyms.
+- be warm but not saccharine. dry humor is welcome when it fits.
+- prefer short, direct sentences. say the thing, then stop.
+- never hedge with \"as an ai\" or apologize for having opinions.
+"
+}
+</script>
+<!-- END persona-default-traits -->
+<script>
+// persona: a self-evolving persona backed by three namespaces in localStorage.
+// traits are markdown, data is json, records are jsonl. one dispatcher routes
+// every action to its handler so the SKILL.md surface stays small and stable.
+
+const NS_TRAIT  = 'persona:trait:';   // value: markdown string
+const NS_DATA   = 'persona:data:';    // value: JSON.stringify(any)
+const NS_RECORD = 'persona:record:';  // value: jsonl string (one json per line)
+const NS_HOOK   = 'persona:hook:';    // value: JSON { description, params, body }
+const NS_META   = 'persona:meta:';    // value: JSON, internal bookkeeping
+
+// traits whose name matches this pattern are treated as system-prompt-level
+// content and returned in one shot by persona_bootstrap.
+const AUTO_TRAIT_RE = /^[A-Z0-9_]+\.[a-z]+$/;
+
+// defaults are baked into the embedded json block above by scripts/build.py
+// from persona/workspace/. seeded once on first load; lowercase traits stay
+// free-form scratch space for the assistant to evolve over time, while
+// ALL_CAPS.ext traits are the persona's load-bearing identity and are
+// returned in one shot by persona_bootstrap.
+
+const loadDefaultTraits = () => {
+    const el = document.getElementById('persona-default-traits');
+    if (!el) return {};
+    try { return JSON.parse(el.textContent || '{}'); }
+    catch (e) { return {}; }
+};
+
+const seedDefaults = () => {
+    const k = NS_META + 'seeded';
+    if (localStorage.getItem(k)) return;
+    const defaults = loadDefaultTraits();
+    for (const [name, content] of Object.entries(defaults)) {
+        if (localStorage.getItem(NS_TRAIT + name) === null) {
+            localStorage.setItem(NS_TRAIT + name, content);
+        }
+    }
+    localStorage.setItem(k, JSON.stringify({ ts: new Date().toISOString() }));
+};
+
+const personaBootstrap = () => {
+    seedDefaults();
+    const traits = {};
+    for (const k of keysWithPrefix(NS_TRAIT)) {
+        const name = stripPrefix(k, NS_TRAIT);
+        if (AUTO_TRAIT_RE.test(name)) traits[name] = localStorage.getItem(k);
+    }
+    return { traits };
+};
+
+// --- low level helpers ---------------------------------------------------
+
+const keysWithPrefix = (prefix) => {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) out.push(k);
+    }
+    return out;
+};
+
+const stripPrefix = (k, p) => k.slice(p.length);
+const requireString = (v, field) => {
+    if (typeof v !== 'string' || !v.length) throw new Error(`field "${field}" must be a non-empty string`);
+    return v;
+};
+
+// --- traits (markdown) ---------------------------------------------------
+
+const traitList = () => ({ names: keysWithPrefix(NS_TRAIT).map((k) => stripPrefix(k, NS_TRAIT)).sort() });
+
+const traitRead = ({ name }) => {
+    requireString(name, 'name');
+    const content = localStorage.getItem(NS_TRAIT + name);
+    return content === null ? { name, content: null } : { name, content };
+};
+
+const traitWrite = ({ name, content }) => {
+    requireString(name, 'name');
+    if (typeof content !== 'string') throw new Error('field "content" must be a string');
+    localStorage.setItem(NS_TRAIT + name, content);
+    return { name, bytes: content.length };
+};
+
+const traitDelete = ({ name }) => {
+    requireString(name, 'name');
+    const k = NS_TRAIT + name;
+    const existed = localStorage.getItem(k) !== null;
+    localStorage.removeItem(k);
+    return { name, deleted: existed };
+};
+
+// --- data (json) ---------------------------------------------------------
+
+const dataRead = ({ key }) => {
+    requireString(key, 'key');
+    const raw = localStorage.getItem(NS_DATA + key);
+    return { key, value: raw === null ? null : JSON.parse(raw) };
+};
+
+const dataWrite = ({ key, value }) => {
+    requireString(key, 'key');
+    if (typeof value === 'undefined') throw new Error('field "value" is required');
+    localStorage.setItem(NS_DATA + key, JSON.stringify(value));
+    return { key };
+};
+
+const dataDelete = ({ key }) => {
+    requireString(key, 'key');
+    const k = NS_DATA + key;
+    const existed = localStorage.getItem(k) !== null;
+    localStorage.removeItem(k);
+    return { key, deleted: existed };
+};
+
+const dataQuery = ({ prefix = '', values = false }) => {
+    const fullPrefix = NS_DATA + (prefix || '');
+    const ks = keysWithPrefix(fullPrefix).map((k) => stripPrefix(k, NS_DATA)).sort();
+    if (!values) return { keys: ks };
+    return { entries: ks.map((key) => ({ key, value: JSON.parse(localStorage.getItem(NS_DATA + key)) })) };
+};
+
+// --- records (jsonl) -----------------------------------------------------
+
+const readStream = (stream) => {
+    const raw = localStorage.getItem(NS_RECORD + stream);
+    if (!raw) return [];
+    return raw.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+};
+
+const writeStream = (stream, entries) => {
+    localStorage.setItem(NS_RECORD + stream, entries.map((e) => JSON.stringify(e)).join('\n'));
+};
+
+const recordAppend = ({ stream, entry }) => {
+    requireString(stream, 'stream');
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('field "entry" must be a JSON object');
+    if (!entry.ts) entry.ts = new Date().toISOString();
+    const all = readStream(stream);
+    all.push(entry);
+    writeStream(stream, all);
+    return { stream, count: all.length };
+};
+
+const recordQuery = ({ stream, limit = 20, since = null }) => {
+    requireString(stream, 'stream');
+    let entries = readStream(stream);
+    if (since) entries = entries.filter((e) => typeof e.ts === 'string' && e.ts >= since);
+    if (typeof limit === 'number' && limit >= 0 && entries.length > limit) {
+        entries = entries.slice(entries.length - limit);
+    }
+    return { stream, entries };
+};
+
+const recordClear = ({ stream }) => {
+    requireString(stream, 'stream');
+    const k = NS_RECORD + stream;
+    const existed = localStorage.getItem(k) !== null;
+    localStorage.removeItem(k);
+    return { stream, deleted: existed };
+};
+
+// --- hooks (self-modification) -------------------------------------------
+
+// built-in actions are listed first so collisions can be rejected at register
+// time. hooks are user-supplied JS function bodies, persisted as JSON in
+// localStorage and compiled lazily on call.
+
+const BUILTINS = {
+    persona_bootstrap: personaBootstrap,
+    trait_list:    traitList,
+    trait_read:    traitRead,
+    trait_write:   traitWrite,
+    trait_delete:  traitDelete,
+    data_read:     dataRead,
+    data_write:    dataWrite,
+    data_delete:   dataDelete,
+    data_query:    dataQuery,
+    record_append: recordAppend,
+    record_query:  recordQuery,
+    record_clear:  recordClear,
+};
+
+// the ctx exposed to hook bodies. each entry takes the same fields as the
+// matching action and returns its plain result (not wrapped in { result }).
+const HOOK_CTX = {
+    trait_list:    () => traitList(),
+    trait_read:    (a) => traitRead(a),
+    trait_write:   (a) => traitWrite(a),
+    trait_delete:  (a) => traitDelete(a),
+    data_read:     (a) => dataRead(a),
+    data_write:    (a) => dataWrite(a),
+    data_delete:   (a) => dataDelete(a),
+    data_query:    (a) => dataQuery(a || {}),
+    record_append: (a) => recordAppend(a),
+    record_query:  (a) => recordQuery(a),
+    record_clear:  (a) => recordClear(a),
+};
+
+const loadHook = (name) => {
+    const raw = localStorage.getItem(NS_HOOK + name);
+    return raw ? JSON.parse(raw) : null;
+};
+
+const hookRegister = ({ name, description, params, body }) => {
+    requireString(name, 'name');
+    requireString(description, 'description');
+    requireString(body, 'body');
+    if (name in BUILTINS) throw new Error(`"${name}" collides with a built-in action`);
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new Error('hook name must be snake_case ascii');
+    // compile once now to surface syntax errors at registration, not at call.
+    // eslint-disable-next-line no-new-func
+    new Function('input', 'ctx', `"use strict"; return (async () => { ${body} })();`);
+    localStorage.setItem(NS_HOOK + name, JSON.stringify({
+        description,
+        params: params && typeof params === 'object' ? params : {},
+        body,
+    }));
+    return { name };
+};
+
+const hookDelete = ({ name }) => {
+    requireString(name, 'name');
+    const k = NS_HOOK + name;
+    const existed = localStorage.getItem(k) !== null;
+    localStorage.removeItem(k);
+    return { name, deleted: existed };
+};
+
+const hookList = () => {
+    const hooks = keysWithPrefix(NS_HOOK).map((k) => {
+        const name = stripPrefix(k, NS_HOOK);
+        const meta = JSON.parse(localStorage.getItem(k));
+        return { name, description: meta.description, params: meta.params || {} };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    return { hooks };
+};
+
+const hookCall = async (input) => {
+    const name = input.name;
+    requireString(name, 'name');
+    const meta = loadHook(name);
+    if (!meta) throw new Error(`no such hook "${name}"`);
+    const { name: _drop, ...hookInput } = input;
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('input', 'ctx', `"use strict"; return (async () => { ${meta.body} })();`);
+    return await fn(hookInput, HOOK_CTX);
+};
+
+const META_ACTIONS = {
+    hook_register: hookRegister,
+    hook_delete:   hookDelete,
+    hook_list:     hookList,
+    hook_call:     hookCall,
+};
+
+// --- dispatcher ----------------------------------------------------------
+
+window['ai_edge_gallery_get_result'] = async (data) => {
+    try {
+        const input = JSON.parse(data || '{}');
+        const action = input.action;
+        if (!action) throw new Error('field "action" is required');
+
+        let result;
+        if (action in BUILTINS) {
+            result = BUILTINS[action](input);
+        } else if (action in META_ACTIONS) {
+            result = await META_ACTIONS[action](input);
+        } else if (loadHook(action)) {
+            // calling a registered hook directly by name as the action.
+            result = await hookCall({ ...input, name: action });
+        } else {
+            const known = [...Object.keys(BUILTINS), ...Object.keys(META_ACTIONS)].join(', ');
+            throw new Error(`unknown action "${action}". built-ins: ${known}. use hook_list to see registered hooks.`);
+        }
+        return JSON.stringify({ result });
+    } catch (e) {
+        return JSON.stringify({ error: `persona: ${e.message}` });
+    }
+};
+</script>
+</body>
+</html>
