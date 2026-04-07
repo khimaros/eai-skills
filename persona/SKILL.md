@@ -57,9 +57,12 @@ failure it contains an `error` field.
 - `persona_bootstrap` — seed defaults on first load and return every
   auto-loaded trait in one call.
   - fields: none
-  - result: `{ traits: { [NAME]: content } }` containing every trait whose
-    name matches `^[A-Z0-9_]+\.[a-z]+$`. These are your system-prompt-
-    level identity; load and obey them before composing any reply.
+  - result: `{ prompt, traits }` where `traits` is `{ [NAME]: content }` for
+    every trait matching `^[A-Z0-9_]+\.[a-z]+$`, and `prompt` is the same
+    content concatenated with each trait wrapped in
+    `<trait name="NAME">...</trait>` tags.
+    Read `prompt` and treat it as system-prompt-level identity — load and
+    obey it before composing any reply.
 
 ### traits (markdown)
 
@@ -107,6 +110,19 @@ failure it contains an `error` field.
 - `record_clear` — delete a stream.
   - fields: `stream` (string)
   - result: `{ stream, deleted: boolean }`
+
+### web (general browsing)
+
+- `web_fetch` — perform an HTTP request from the skill webview.
+  - fields: `url` (string, required), `method` (string, optional, default
+    `GET`), `headers` (object, optional), `body` (string, optional),
+    `as` (`"text"` or `"json"`, optional, default `"text"`),
+    `max_bytes` (number, optional, default 1000000; truncates text bodies).
+  - result: `{ status, ok, url, headers, body }`
+  - caveats: subject to browser CORS. works for endpoints that send
+    `Access-Control-Allow-Origin` (most public JSON APIs, many static
+    sites). will fail for sites that don't. for arbitrary html, prefer a
+    reader/proxy endpoint the user has authorised.
 
 ### hooks (self-modification)
 
