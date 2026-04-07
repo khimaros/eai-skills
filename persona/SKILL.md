@@ -57,10 +57,12 @@ failure it contains an `error` field.
 - `persona_bootstrap` — seed defaults on first load and return every
   auto-loaded trait in one call.
   - fields: none
-  - result: `{ prompt, traits }` where `traits` is `{ [NAME]: content }` for
-    every trait matching `^[A-Z0-9_]+\.[a-z]+$`, and `prompt` is the same
-    content concatenated with each trait wrapped in
-    `<trait name="NAME">...</trait>` tags.
+  - result: `{ prompt, traits, available }` where `traits` is
+    `{ [NAME]: content }` for every trait matching `^[A-Z0-9_]+\.[a-z]+$`,
+    `prompt` is the same content concatenated with each trait wrapped in
+    `<trait name="NAME">...</trait>` tags, and `available` is the sorted list
+    of remaining trait names (lowercase scratch traits) that exist but were
+    not auto-loaded — call `trait_read` on any of these as needed.
     Read `prompt` and treat it as system-prompt-level identity — load and
     obey it before composing any reply.
 

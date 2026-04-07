@@ -57,21 +57,25 @@ const personaBootstrap = () => {
     seedDefaults();
     const traits = {};
     const names = [];
+    const available = [];
     for (const k of keysWithPrefix(NS_TRAIT)) {
         const name = stripPrefix(k, NS_TRAIT);
         if (AUTO_TRAIT_RE.test(name)) {
             traits[name] = localStorage.getItem(k);
             names.push(name);
+        } else {
+            available.push(name);
         }
     }
     names.sort();
+    available.sort();
     // wrap each trait in an xml-like tag. small instruction-tuned LLMs handle
     // these much more reliably than ascii rules or markdown headers, because
     // the open/close tags give an unambiguous block boundary.
     const prompt = names
         .map((n) => `<trait name="${n}">\n${traits[n]}\n</trait>`)
         .join('\n\n');
-    return { prompt, traits };
+    return { prompt, traits, available };
 };
 
 // --- low level helpers ---------------------------------------------------
