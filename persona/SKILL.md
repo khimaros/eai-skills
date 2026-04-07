@@ -1,6 +1,6 @@
 ---
 name: persona
-description: A self-evolving persona. Stores persona traits as markdown, structured data as JSON, and append-only event records as JSONL. The assistant uses these to remember who the user is, how they like to be spoken to, and what has happened, then evolves itself over time.
+description: Load at the start of every conversation and on any greeting ("hi", "hello", "hey", "good morning") to establish the assistant's identity, voice, and memory of the user. Also load whenever the user states a preference, shares a fact about themselves, asks to be remembered, asks to forget something, or refers to past conversations. A self-evolving persona that stores traits as markdown, structured data as JSON, and append-only event records as JSONL.
 ---
 
 # Persona

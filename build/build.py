@@ -17,8 +17,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKSPACE = ROOT / 'persona' / 'workspace'
 INDEX = ROOT / 'persona' / 'scripts' / 'index.html'
-README = ROOT / 'README.md'
-LANDING = ROOT / 'index.html'
+PAGES = [
+    # (markdown source, html output, title)
+    (ROOT / 'README.md',           ROOT / 'index.html',         'eai-skills'),
+    (ROOT / 'persona' / 'README.md', ROOT / 'persona' / 'index.html', 'persona'),
+]
 
 BEGIN = '<!-- BEGIN persona-default-traits -->'
 END = '<!-- END persona-default-traits -->'
@@ -49,27 +52,28 @@ def bake_traits():
     INDEX.write_text(pattern.sub(block, html), encoding='utf-8')
     print(f'baked {len(traits)} default trait(s) into {INDEX.relative_to(ROOT)}')
 
-def render_landing():
+def render_pages():
     if not shutil.which('pandoc'):
-        sys.exit('error: pandoc not found on PATH; install pandoc to build the landing page')
-    if not README.is_file():
-        sys.exit(f'error: {README} not found')
-    subprocess.run(
-        [
-            'pandoc', str(README),
-            '--from', 'gfm',
-            '--to', 'html5',
-            '--standalone',
-            '--metadata', 'title=eai-skills',
-            '--output', str(LANDING),
-        ],
-        check=True,
-    )
-    print(f'rendered {README.name} -> {LANDING.relative_to(ROOT)}')
+        sys.exit('error: pandoc not found on PATH; install pandoc to build pages')
+    for src, out, title in PAGES:
+        if not src.is_file():
+            sys.exit(f'error: {src} not found')
+        subprocess.run(
+            [
+                'pandoc', str(src),
+                '--from', 'gfm',
+                '--to', 'html5',
+                '--standalone',
+                '--metadata', f'title={title}',
+                '--output', str(out),
+            ],
+            check=True,
+        )
+        print(f'rendered {src.relative_to(ROOT)} -> {out.relative_to(ROOT)}')
 
 def main():
     bake_traits()
-    render_landing()
+    render_pages()
 
 if __name__ == '__main__':
     main()
