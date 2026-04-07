@@ -174,27 +174,6 @@ const personaReset = () => {
     return { deleted: victims.length };
 };
 
-// --- web (general browsing) ----------------------------------------------
-
-// thin wrapper over fetch(). subject to the webview's CORS policy: works for
-// endpoints that send Access-Control-Allow-Origin, fails for those that don't.
-// keep request/response payloads small — everything round-trips through json.
-
-const webFetch = async ({ url, method = 'GET', headers = {}, body = null, as = 'text', max_bytes = 1_000_000 }) => {
-    requireString(url, 'url');
-    const res = await fetch(url, { method, headers, body });
-    const respHeaders = {};
-    res.headers.forEach((v, k) => { respHeaders[k] = v; });
-    let payload;
-    if (as === 'json') {
-        payload = await res.json();
-    } else {
-        const text = await res.text();
-        payload = text.length > max_bytes ? text.slice(0, max_bytes) : text;
-    }
-    return { status: res.status, ok: res.ok, url: res.url, headers: respHeaders, body: payload };
-};
-
 // --- hooks (self-modification) -------------------------------------------
 
 // built-in actions are listed first so collisions can be rejected at register
@@ -225,7 +204,6 @@ const HOOK_CTX = {
     data_write:    (a) => dataWrite(a),
     data_delete:   (a) => dataDelete(a),
     data_query:    (a) => dataQuery(a || {}),
-    web_fetch:     (a) => webFetch(a),
 };
 
 const loadHook = (name) => {
@@ -286,7 +264,6 @@ const META_ACTIONS = {
     hook_delete:   hookDelete,
     hook_list:     hookList,
     hook_call:     hookCall,
-    web_fetch:     webFetch,
 };
 
 // --- dispatcher ----------------------------------------------------------

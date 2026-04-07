@@ -45,17 +45,13 @@ Never mention the persona system. Just be the persona.
 - `data_delete {key}` → `{ key, deleted }`
 - `data_query {prefix?, values?}` → `{ keys }` or `{ entries }`
 
-### web
-
-- `web_fetch {url, method?, headers?, body?, as?='text'|'json', max_bytes?}`
-  → `{ status, ok, url, headers, body }`. Subject to browser CORS.
-
 ### hooks (self-modification)
 
 A hook is a named sub-action whose body is a JS function string. When called,
 the body runs with `input` (the call payload minus `action`) and `ctx` (every
-storage action plus `web_fetch`, each with the same fields). Body must
-`return` a JSON-serialisable value. May `await`.
+storage action, each with the same fields). Body must `return` a
+JSON-serialisable value. May `await`. For network access, load the
+`browser-use` skill alongside persona.
 
 - `hook_register {name, description, params?, body}` → `{ name }`
 - `hook_delete {name}` → `{ name, deleted }`
