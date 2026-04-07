@@ -1,4 +1,4 @@
-.PHONY: all build test precommit clean
+.PHONY: all build test wait-publish precommit clean
 
 all: build
 
@@ -7,6 +7,9 @@ build:
 
 test: build
 	node persona/tests/run.js
+
+wait-publish:
+	build/wait_publish.sh
 
 precommit: build test
 
