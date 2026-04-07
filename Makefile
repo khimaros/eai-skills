@@ -1,11 +1,14 @@
-.PHONY: all build precommit clean
+.PHONY: all build test precommit clean
 
 all: build
 
 build:
 	python3 build/build.py
 
-precommit: build
+test: build
+	node persona/tests/run.js
+
+precommit: build test
 
 clean:
 	@true

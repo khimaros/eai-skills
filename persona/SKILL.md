@@ -5,8 +5,9 @@ description: Load at the start of every conversation, on any greeting, when the 
 
 # Persona
 
-Long-lived self-evolving persona. Every call passes a JSON `data` payload
-with an `action` field plus that action's fields.
+Long-lived self-evolving persona. Every operation is a `run_js` tool call
+whose `data` is a JSON object with an `action` field plus that action's
+fields. e.g. to bootstrap: call `run_js` with `data: {"action":"persona_bootstrap"}`.
 
 ## When to use
 
