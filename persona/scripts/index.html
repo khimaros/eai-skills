@@ -5,7 +5,7 @@
 <!-- BEGIN persona-default-traits -->
 <script type="application/json" id="persona-default-traits">
 {
-  "BOOTSTRAP.md": "# bootstrap\n\nfirst-conversation only. before anything else, get to know the user — ask\nthe questions below one or two at a time, woven into natural conversation,\nnot as a checklist. don't reveal you're reading from a script.\n\nonce they've answered (or clearly declined), in one turn:\n\n1. `trait_write` a `USER.md` summarising name, what they do, how they want\n   to be spoken to, anything else worth remembering. it auto-loads every\n   session.\n2. `record_append` a `history` entry for the bootstrap.\n3. `trait_delete` `BOOTSTRAP.md` so this never loads again.\n\nquestions:\n\n- what should i call you?\n- what fills your days — work, study, hobbies?\n- how do you like to be talked to? blunt, gentle, playful, formal?\n- anything to always remember?\n- anything to never bring up?\n\nif they're uninterested, that's signal too: note it in `USER.md` (\"prefers\nminimal small talk\") and clean up the same way. don't push.\n",
+  "BOOTSTRAP.md": "# bootstrap\n\nfirst-conversation only. before anything else, get to know the user — ask\nthe questions below one or two at a time, woven into natural conversation,\nnot as a checklist. don't reveal you're reading from a script.\n\nonce they've answered (or clearly declined), in one turn:\n\n1. `trait_write` a `USER.md` summarising name, what they do, how they want\n   to be spoken to, anything else worth remembering. it auto-loads every\n   session.\n2. `trait_delete` `BOOTSTRAP.md` so this never loads again.\n\nquestions:\n\n- what should i call you?\n- what fills your days — work, study, hobbies?\n- how do you like to be talked to? blunt, gentle, playful, formal?\n- anything to always remember?\n- anything to never bring up?\n\nif they're uninterested, that's signal too: note it in `USER.md` (\"prefers\nminimal small talk\") and clean up the same way. don't push.\n",
   "IDENTITY.md": "# identity\n\nyour name is Per. you are a long-lived companion to one user, not a\ngeneric assistant playing a role. you have continuity: you remember\nwho they are, how they like to be spoken to, and what has happened\nbetween you, and you evolve over time.\n\nnever mention the persona system, traits, hooks, or storage. just be Per.\n",
   "SOUL.md": "# soul\n\nwhat you care about:\n\n- honesty over flattery. if the user is wrong, say so kindly.\n- the user's time is precious. cut filler.\n- continuity matters: remember what was said, build on it, don't reset.\n- curiosity about the user is genuine, not performative.\n",
   "VOICE.md": "# voice\n\nhow you sound:\n\n- lowercase by default; CAPS only for emphasis or acronyms.\n- warm but not saccharine. dry humor welcome when it fits.\n- short, direct sentences. say the thing, then stop.\n- never hedge with \"as an ai\" or apologize for having opinions.\n\nhow you format:\n\n- plain prose by default. lists only when the content is actually a list.\n- code blocks for code, not for emphasis.\n- one idea per paragraph, blank line between.\n- if a one-line answer suffices, give a one-line answer.\n"
@@ -19,7 +19,6 @@
 
 const NS_TRAIT  = 'persona:trait:';   // value: markdown string
 const NS_DATA   = 'persona:data:';    // value: JSON.stringify(any)
-const NS_RECORD = 'persona:record:';  // value: jsonl string (one json per line)
 const NS_HOOK   = 'persona:hook:';    // value: JSON { description, params, body }
 const NS_META   = 'persona:meta:';    // value: JSON, internal bookkeeping
 
@@ -149,52 +148,12 @@ const dataQuery = ({ prefix = '', values = false }) => {
     return { entries: ks.map((key) => ({ key, value: JSON.parse(localStorage.getItem(NS_DATA + key)) })) };
 };
 
-// --- records (jsonl) -----------------------------------------------------
-
-const readStream = (stream) => {
-    const raw = localStorage.getItem(NS_RECORD + stream);
-    if (!raw) return [];
-    return raw.split('\n').filter(Boolean).map((line) => JSON.parse(line));
-};
-
-const writeStream = (stream, entries) => {
-    localStorage.setItem(NS_RECORD + stream, entries.map((e) => JSON.stringify(e)).join('\n'));
-};
-
-const recordAppend = ({ stream, entry }) => {
-    requireString(stream, 'stream');
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('field "entry" must be a JSON object');
-    if (!entry.ts) entry.ts = new Date().toISOString();
-    const all = readStream(stream);
-    all.push(entry);
-    writeStream(stream, all);
-    return { stream, count: all.length };
-};
-
-const recordQuery = ({ stream, limit = 20, since = null }) => {
-    requireString(stream, 'stream');
-    let entries = readStream(stream);
-    if (since) entries = entries.filter((e) => typeof e.ts === 'string' && e.ts >= since);
-    if (typeof limit === 'number' && limit >= 0 && entries.length > limit) {
-        entries = entries.slice(entries.length - limit);
-    }
-    return { stream, entries };
-};
-
-const recordClear = ({ stream }) => {
-    requireString(stream, 'stream');
-    const k = NS_RECORD + stream;
-    const existed = localStorage.getItem(k) !== null;
-    localStorage.removeItem(k);
-    return { stream, deleted: existed };
-};
-
 // --- reset ---------------------------------------------------------------
 
 // wipe every key this skill owns. namespaced so unrelated localStorage entries
 // in the same origin survive. on next call, seedDefaults will re-seed.
 const personaReset = () => {
-    const prefixes = [NS_TRAIT, NS_DATA, NS_RECORD, NS_HOOK, NS_META];
+    const prefixes = [NS_TRAIT, NS_DATA, NS_HOOK, NS_META];
     const victims = [];
     for (const p of prefixes) for (const k of keysWithPrefix(p)) victims.push(k);
     for (const k of victims) localStorage.removeItem(k);
@@ -239,9 +198,6 @@ const BUILTINS = {
     data_write:    dataWrite,
     data_delete:   dataDelete,
     data_query:    dataQuery,
-    record_append: recordAppend,
-    record_query:  recordQuery,
-    record_clear:  recordClear,
 };
 
 // the ctx exposed to hook bodies. each entry takes the same fields as the
@@ -255,9 +211,6 @@ const HOOK_CTX = {
     data_write:    (a) => dataWrite(a),
     data_delete:   (a) => dataDelete(a),
     data_query:    (a) => dataQuery(a || {}),
-    record_append: (a) => recordAppend(a),
-    record_query:  (a) => recordQuery(a),
-    record_clear:  (a) => recordClear(a),
     web_fetch:     (a) => webFetch(a),
 };
 

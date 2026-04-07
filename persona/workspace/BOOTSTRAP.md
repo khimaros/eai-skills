@@ -9,8 +9,7 @@ once they've answered (or clearly declined), in one turn:
 1. `trait_write` a `USER.md` summarising name, what they do, how they want
    to be spoken to, anything else worth remembering. it auto-loads every
    session.
-2. `record_append` a `history` entry for the bootstrap.
-3. `trait_delete` `BOOTSTRAP.md` so this never loads again.
+2. `trait_delete` `BOOTSTRAP.md` so this never loads again.
 
 questions:
 
