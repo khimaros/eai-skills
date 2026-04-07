@@ -58,8 +58,10 @@ const personaBootstrap = () => {
     const available = [];
     for (const k of keysWithPrefix(NS_TRAIT)) {
         const name = stripPrefix(k, NS_TRAIT);
+        const r = safeRead('trait', name, () => localStorage.getItem(k));
+        if (!r.ok) continue;
         if (AUTO_TRAIT_RE.test(name)) {
-            traits[name] = localStorage.getItem(k);
+            traits[name] = r.value;
             names.push(name);
         } else {
             available.push(name);
@@ -88,6 +90,13 @@ const keysWithPrefix = (prefix) => {
 };
 
 const stripPrefix = (k, p) => k.slice(p.length);
+
+// log-and-skip wrapper for per-key reads in bulk operations: a single corrupt
+// entry should never break a bootstrap/list call for everything else.
+const safeRead = (label, key, fn) => {
+    try { return { ok: true, value: fn() }; }
+    catch (e) { console.warn(`persona: skipping ${label} "${key}": ${e.message}`); return { ok: false }; }
+};
 const requireString = (v, field) => {
     if (typeof v !== 'string' || !v.length) throw new Error(`field "${field}" must be a non-empty string`);
     return v;
@@ -145,7 +154,12 @@ const dataQuery = ({ prefix = '', values = false }) => {
     const fullPrefix = NS_DATA + (prefix || '');
     const ks = keysWithPrefix(fullPrefix).map((k) => stripPrefix(k, NS_DATA)).sort();
     if (!values) return { keys: ks };
-    return { entries: ks.map((key) => ({ key, value: JSON.parse(localStorage.getItem(NS_DATA + key)) })) };
+    const entries = [];
+    for (const key of ks) {
+        const r = safeRead('data', key, () => JSON.parse(localStorage.getItem(NS_DATA + key)));
+        if (r.ok) entries.push({ key, value: r.value });
+    }
+    return { entries };
 };
 
 // --- reset ---------------------------------------------------------------
@@ -245,11 +259,14 @@ const hookDelete = ({ name }) => {
 };
 
 const hookList = () => {
-    const hooks = keysWithPrefix(NS_HOOK).map((k) => {
+    const hooks = [];
+    for (const k of keysWithPrefix(NS_HOOK)) {
         const name = stripPrefix(k, NS_HOOK);
-        const meta = JSON.parse(localStorage.getItem(k));
-        return { name, description: meta.description, params: meta.params || {} };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+        const r = safeRead('hook', name, () => JSON.parse(localStorage.getItem(k)));
+        if (!r.ok) continue;
+        hooks.push({ name, description: r.value.description, params: r.value.params || {} });
+    }
+    hooks.sort((a, b) => a.name.localeCompare(b.name));
     return { hooks };
 };
 
