@@ -176,21 +176,20 @@
 <p>a self-evolving, long-lived persona for the <a
 href="https://github.com/google-ai-edge/gallery">google ai edge
 gallery</a>. state lives in the skill webview's
-<code>localStorage</code> across four namespaces:</p>
+<code>localStorage</code> across three namespaces:</p>
 <ul>
 <li><strong>traits</strong> — markdown documents (voice, values,
 identity, knowledge of the user)</li>
 <li><strong>data</strong> — JSON values for structured facts</li>
-<li><strong>records</strong> — append-only JSONL event streams</li>
 <li><strong>hooks</strong> — user-defined JavaScript sub-actions the
 persona can register at runtime</li>
 </ul>
 <p>traits whose name matches <code>^[A-Z0-9_]+\.[a-z]+$</code> (e.g.
 <code>IDENTITY.md</code>, <code>SOUL.md</code>, <code>VOICE.md</code>,
-<code>STYLE.md</code>, <code>USER.md</code>) are auto-loaded at session
-start by <code>persona_bootstrap</code> and treated as
-system-prompt-level identity. all other traits are evolving scratch
-space the persona updates over time.</p>
+<code>USER.md</code>) are auto-loaded at session start by
+<code>persona_bootstrap</code> and treated as system-prompt-level
+identity. all other traits are evolving scratch space the persona
+updates over time.</p>
 <p><strong>load it in the gallery from:</strong></p>
 <pre><code>https://khimaros.github.io/eai-skills/persona/</code></pre>
 <p>verify with
@@ -205,7 +204,6 @@ space the persona updates over time.</p>
     IDENTITY.md
     SOUL.md
     VOICE.md
-    STYLE.md
     BOOTSTRAP.md</code></pre>
 <h2 id="defaults">defaults</h2>
 <p>the files in <code>workspace/</code> are the source of truth for the
@@ -215,8 +213,8 @@ persona's seeded identity. they are baked into
 <ul>
 <li><code>IDENTITY.md</code> — name and continuity stance</li>
 <li><code>SOUL.md</code> — values</li>
-<li><code>VOICE.md</code> — how the persona speaks</li>
-<li><code>STYLE.md</code> — formatting / length preferences</li>
+<li><code>VOICE.md</code> — how the persona speaks and formats
+replies</li>
 <li><code>BOOTSTRAP.md</code> — one-shot onboarding script; the persona
 deletes this trait after writing <code>USER.md</code></li>
 </ul>

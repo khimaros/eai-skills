@@ -1,15 +1,14 @@
 # persona
 
 a self-evolving, long-lived persona for the [google ai edge gallery](https://github.com/google-ai-edge/gallery).
-state lives in the skill webview's `localStorage` across four namespaces:
+state lives in the skill webview's `localStorage` across three namespaces:
 
 - **traits** — markdown documents (voice, values, identity, knowledge of the user)
 - **data** — JSON values for structured facts
-- **records** — append-only JSONL event streams
 - **hooks** — user-defined JavaScript sub-actions the persona can register at runtime
 
 traits whose name matches `^[A-Z0-9_]+\.[a-z]+$` (e.g. `IDENTITY.md`,
-`SOUL.md`, `VOICE.md`, `STYLE.md`, `USER.md`) are auto-loaded at session
+`SOUL.md`, `VOICE.md`, `USER.md`) are auto-loaded at session
 start by `persona_bootstrap` and treated as system-prompt-level identity.
 all other traits are evolving scratch space the persona updates over time.
 
@@ -33,7 +32,6 @@ persona/
     IDENTITY.md
     SOUL.md
     VOICE.md
-    STYLE.md
     BOOTSTRAP.md
 ```
 
@@ -45,8 +43,7 @@ and copied into `localStorage` on the very first session.
 
 - `IDENTITY.md` — name and continuity stance
 - `SOUL.md` — values
-- `VOICE.md` — how the persona speaks
-- `STYLE.md` — formatting / length preferences
+- `VOICE.md` — how the persona speaks and formats replies
 - `BOOTSTRAP.md` — one-shot onboarding script; the persona deletes this
   trait after writing `USER.md`
 
