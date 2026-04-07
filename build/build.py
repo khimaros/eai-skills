@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""bake persona/workspace/*.md into persona/scripts/index.html.
+"""local pre-build for the eai-skills repo.
 
-reads every regular file under persona/workspace/ and writes a JSON map
-{filename: contents} into the marked <script> block in index.html. the
-runtime reads this block to seed localStorage on first load.
+two jobs:
+  1. bake persona/workspace/*.md into the JSON block in persona/scripts/index.html
+     so the runtime can seed localStorage on first load.
+  2. render README.md into a standalone index.html at the repo root, so the
+     pages site has a real landing page even with .nojekyll on.
 """
 import json
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKSPACE = ROOT / 'persona' / 'workspace'
 INDEX = ROOT / 'persona' / 'scripts' / 'index.html'
+README = ROOT / 'README.md'
+LANDING = ROOT / 'index.html'
 
 BEGIN = '<!-- BEGIN persona-default-traits -->'
 END = '<!-- END persona-default-traits -->'
@@ -26,7 +32,7 @@ def collect():
         if p.is_file() and not p.name.startswith('.')
     }
 
-def main():
+def bake_traits():
     traits = collect()
     payload = json.dumps(traits, indent=2, ensure_ascii=False)
     block = (
@@ -42,6 +48,28 @@ def main():
         sys.exit(f'error: markers {BEGIN!r}..{END!r} not found in {INDEX}')
     INDEX.write_text(pattern.sub(block, html), encoding='utf-8')
     print(f'baked {len(traits)} default trait(s) into {INDEX.relative_to(ROOT)}')
+
+def render_landing():
+    if not shutil.which('pandoc'):
+        sys.exit('error: pandoc not found on PATH; install pandoc to build the landing page')
+    if not README.is_file():
+        sys.exit(f'error: {README} not found')
+    subprocess.run(
+        [
+            'pandoc', str(README),
+            '--from', 'gfm',
+            '--to', 'html5',
+            '--standalone',
+            '--metadata', 'title=eai-skills',
+            '--output', str(LANDING),
+        ],
+        check=True,
+    )
+    print(f'rendered {README.name} -> {LANDING.relative_to(ROOT)}')
+
+def main():
+    bake_traits()
+    render_landing()
 
 if __name__ == '__main__':
     main()
