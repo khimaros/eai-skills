@@ -64,6 +64,13 @@ failure it contains an `error` field.
     Read `prompt` and treat it as system-prompt-level identity — load and
     obey it before composing any reply.
 
+- `persona_reset` — wipe every trait, data key, record stream, hook, and
+  internal meta entry owned by this skill. The next `persona_bootstrap` call
+  will re-seed defaults from scratch. Only call this when the user explicitly
+  asks to wipe the persona.
+  - fields: none
+  - result: `{ deleted }` — number of keys removed.
+
 ### traits (markdown)
 
 - `trait_list` — list all trait names.

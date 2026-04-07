@@ -244,6 +244,18 @@ const recordClear = ({ stream }) => {
     return { stream, deleted: existed };
 };
 
+// --- reset ---------------------------------------------------------------
+
+// wipe every key this skill owns. namespaced so unrelated localStorage entries
+// in the same origin survive. on next call, seedDefaults will re-seed.
+const personaReset = () => {
+    const prefixes = [NS_TRAIT, NS_DATA, NS_RECORD, NS_HOOK, NS_META];
+    const victims = [];
+    for (const p of prefixes) for (const k of keysWithPrefix(p)) victims.push(k);
+    for (const k of victims) localStorage.removeItem(k);
+    return { deleted: victims.length };
+};
+
 // --- web (general browsing) ----------------------------------------------
 
 // thin wrapper over fetch(). subject to the webview's CORS policy: works for
@@ -273,6 +285,7 @@ const webFetch = async ({ url, method = 'GET', headers = {}, body = null, as = '
 
 const BUILTINS = {
     persona_bootstrap: personaBootstrap,
+    persona_reset:  personaReset,
     trait_list:    traitList,
     trait_read:    traitRead,
     trait_write:   traitWrite,
