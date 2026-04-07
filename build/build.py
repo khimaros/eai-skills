@@ -49,7 +49,9 @@ def bake_traits():
     pattern = re.compile(re.escape(BEGIN) + r'.*?' + re.escape(END), re.DOTALL)
     if not pattern.search(html):
         sys.exit(f'error: markers {BEGIN!r}..{END!r} not found in {INDEX}')
-    INDEX.write_text(pattern.sub(block, html), encoding='utf-8')
+    # use a lambda so re.sub doesn't interpret backslash escapes (e.g. \n)
+    # in the replacement string — that would un-escape the JSON payload.
+    INDEX.write_text(pattern.sub(lambda _m: block, html), encoding='utf-8')
     print(f'baked {len(traits)} default trait(s) into {INDEX.relative_to(ROOT)}')
 
 def render_pages():
